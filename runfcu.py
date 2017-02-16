@@ -97,22 +97,31 @@ else: print("ok\n")
 
 pre_disk = shutil.disk_usage(args.dir)  # filesystem level only
 
-print("Beginning removal\n-----------------")
+print("Beginning removal")
+if args.dry_run:
+    print("[  test only    ]")
+print("-----------------")
 for leaf_dir,desc in purge_dirs.items():
     path = os.path.join( args.dir, leaf_dir)
-    wildcard = os.path.join (path, "*")
-    all_files = glob.glob( wildcard, recursive=True )
-    remove_files = [ x for x in all_files if os.path.splitext(x)[1] not in safe_exts]
-    diff = len(all_files) - len(remove_files)
-    if diff < 0:
-        print("WARNING: {} files with extensions in the safe list found in {}".format(diff, leaf))
-        sys.exit(1)
-    print("{} {}".format(len(all_files), desc))
+    if os.path.exists(path):
+        wildcard = os.path.join (path, "**")    # ** matches all files and dirs to arbitrary depth
+        all_files = glob.glob( wildcard, recursive=True )
+        remove_files = [ x for x in all_files if os.path.splitext(x)[1] not in safe_exts]
+        save_the_whales = [ x for x in all_files if os.path.splitext(x)[1] in safe_exts]
+        diff = len(all_files) - len(remove_files)
+        if diff > 0:
+            print("WARNING: {} files with extensions in the safe list found in {}".format(diff, leaf))
+            print("These were:\n{}".format(save_the_whales))
+            sys.exit(1)
+        print("{} {}".format(len(all_files), desc))
 
-    if args.dry_run:
-        print("shutil.rmtree({}, ignore_errors=False, onerror=None)".format(path))
+        # CRITICAL SECTION - PROTECT WITH --dry-run
+        if args.dry_run:
+            print("shutil.rmtree({}, ignore_errors=False, onerror=None)".format(path))
+        else:
+            shutil.rmtree(path, ignore_errors=False, onerror=None)
     else:
-        shutil.rmtree(path, ignore_errors=False, onerror=None)
+        print("0 {} (path {} does not exist)".format(desc, leaf_dir))
 
 print("Done!")
 
